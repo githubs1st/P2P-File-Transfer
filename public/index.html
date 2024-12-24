@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css">
+  <link rel="shortcut icon" href="https://static-00.iconduck.com/assets.00/webrtc-icon-512x496-cef4xjw5.png"
+    type="image/x-icon" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"
+    integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg=="
+    crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="icon" href="https://static-00.iconduck.com/assets.00/webrtc-icon-512x496-cef4xjw5.png"
+    type="image/x-icon" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+  <title>Playground | WebRTC</title>
+</head>
+
+<body>
+  <style>
+    body {
+      padding: 20px;
+    }
+  </style>
+
+  <h1 class="text-center" style="  color: #6990F2;margin-bottom: 20px;">P2P File Tansfer (WebRTC)</h1>
+  <p id="connectionStatus">Not connected to peer.</p>
+
+  <div id="first_toggle">
+    <h3>Instructions:</h3>
+    <ul style="font-size: 14px; line-height: 1.9; margin-top: 20px">
+      <li>Step 1: Open this page in 2 tabs</li>
+      <li>
+        Step 2: In the first tab, click on create offer and copy the text
+        generated in the text box under Local
+      </li>
+      <li>
+        Step 3: In the second tab, paste the text generated in the text box
+        under Remote
+      </li>
+      <li>
+        Step 4: Click on connect under Remote in the 2nd tab, now copy the text
+        generated in the Local text area.
+      </li>
+      <li>
+        Step 5: Paste this in the Remote text box in 1st tab and click on
+        connect.
+      </li>
+      <li>
+        Connected to peer should populate, and now share files. (Max file size:
+        50mb)
+      </li>
+    </ul>
+
+   
+    <div class="container-fluid">
+        <div class="row">
+      <div class="col-lg-6 col-12 ">
+        <h2>Local</h2>
+        <div style="position: relative;">
+          <textarea id="localConfigText" cols="50" rows="15" class="form-control my-2 shadow shadow-md"></textarea>
+          <i class="fa fa-clipboard copy_icon" data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Copy to Clipboard" aria-hidden="true" id="local_copy"></i>
+        </div>
+        <button id="connectLocalConfig" class="btn btn-dark rounded-5 fs-4 m-1 text-capitalize">Create local
+          offer</button>
+      </div>
+
+      <div class="col-lg-6 col-12 ">
+        <h2>Remote</h2>
+        <div style="position: relative;">
+          <textarea id="remoteConfigText" cols="50" rows="15" class="form-control my-2 shadow shadow-md"></textarea>
+          <i class="fa fa-paste copy_icon" data-bs-toggle="tooltip" data-bs-placement="top"
+            data-bs-title="Click to Paste" aria-hidden="true" id="remote_copy"></i>
+        </div>
+        <button data-bs-toggle="tooltip" data-bs-placement="top" title="" id="connectRemoteConfig"
+          class="btn btn-dark rounded-5 fs-4 m-1 text-capitalize">Connect</button>
+      </div>
+    </div>
+  </div>
+  </div>
+
+
+  <br />
+  <hr />
+  <br />
+  <div hidden>
+    <div>
+      <input type="file" id="file-upload" />
+      <button hidden id="sendFile">Send file</button><br />
+      <progress id="progress" value="0"></progress>&nbsp;&nbsp;<label id="progressLabel"></label>
+    </div>
+
+
+
+    <small id="progress"></small>
+    <a href="" id="downloadanchor"></a>
+    <button hidden id="createBlob">Create blob</button>
+
+  </div>
+  <div id="second_toggle" class="hide">
+    <div class="d-flex align-items-center justify-content-center w-100 ">
+      <div class="wrapper shadow-lg shadow">
+        <header>File Uploader </header>
+        <label for="file-upload" id="drag_area">
+          <i class="fas fa-cloud-upload-alt"></i>
+          <p>Browse File to Upload</p>
+        </label>
+        <section class="progress-area"></section>
+        <section class="uploaded-area"></section>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+    crossorigin="anonymous"></script>
+  <script>
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]')
+    const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl))
+  </script>
+  <script>
+    var remoteConnectBtn = document.getElementById("connectRemoteConfig");
+    var localConnectBtn = document.getElementById("connectLocalConfig");
+    var remoteConfigText = document.getElementById("remoteConfigText");
+    var fileUpload = document.getElementById("file-upload");
+    var sendFileBtn = document.getElementById("sendFile");
+    var downloadAnchor = document.getElementById("downloadanchor");
+    var createBlobBtn = document.getElementById("createBlob");
+    var progressbar = document.getElementById("progress");
+    var progressLabel = document.getElementById("progressLabel");
+
+    let localPeer = new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:freestun.net:3479" },
+        {
+          urls: "turn:freestun.net:3479",
+          username: "free",
+          credential: "free",
+        },
+      ],
+    });
+
+    let dataChannel;
+    let receiveBuffer = [];
+    let receivedSize = 0;
+
+    let receivedFile = {};
+
+    localConnectBtn.addEventListener("click", async function () {
+      dataChannel = localPeer.createDataChannel("dataChannel");
+      dataChannel.binaryType = "arraybuffer";
+      dataChannel.onmessage = (msg) => onReceiveMessageCallback(msg);
+      dataChannel.bufferedAmountLowThreshold = 0;
+      dataChannel.onopen = () => {
+        document.getElementById("connectionStatus").innerHTML =
+          "Connected to peer.";
+        document.getElementById("connectionStatus").style.backgroundColor = "rgb(108, 211, 155)";
+        document.getElementById("second_toggle").classList.replace("hide", "show");
+        document.getElementById("first_toggle").classList.add("hide");
+
+      };
+
+      localPeer.onicecandidate = (o) =>
+      (document.querySelector("#localConfigText").value = JSON.stringify(
+        localPeer.localDescription
+      ));
+
+      const localOffer = await localPeer.createOffer();
+      localPeer.setLocalDescription(new RTCSessionDescription(localOffer));
+    });
+
+    remoteConnectBtn.addEventListener("click", async function () {
+      localPeer.setRemoteDescription(JSON.parse(remoteConfigText.value));
+      localPeer.localDescription == null
+        ? localPeer
+          .createAnswer()
+          .then((answer) => localPeer.setLocalDescription(answer))
+        : null;
+      localPeer.onicecandidate = (o) =>
+      (document.querySelector("#localConfigText").value = JSON.stringify(
+        localPeer.localDescription
+      ));
+    });
+
+    sendFileBtn.addEventListener("click", function () { });
+
+    fileUpload.addEventListener("change", function () {
+      try{
+        const file = fileUpload.files[0];
+        progressbar.max = file.size;
+        progressbar.value = 0;
+        progressLabel.innerHTML = 0;
+
+        dataChannel.send(
+          JSON.stringify({
+            name: file.name,
+            size: file.size,
+            type: file.type,
+          })
+        );
+
+        sendData();
+      }catch(e){
+        alert("Peer is removed. please connect again "+e);
+        if(e.message.includes( "send")){
+          alert(e);
+        }
+      }
+     
+    });
+
+    localPeer.ondatachannel = (e) => {
+      dataChannel = e.channel;
+      dataChannel.binaryType = "arraybuffer";
+      dataChannel.bufferedAmountLowThreshold = 0;
+      dataChannel.onmessage = (msg) => onReceiveMessageCallback(msg);
+      dataChannel.onopen = () => {
+        document.getElementById("connectionStatus").innerHTML =
+          "Connected to peer."; document.getElementById("connectionStatus").style.backgroundColor = "rgb(108, 211, 155)";
+        document.getElementById("second_toggle").classList.replace("hide", "show");
+        document.getElementById("first_toggle").classList.add("hide");
+      };
+    };
+
+    function sendData() {
+      let file = fileUpload.files[0];
+      let offset = 0;
+      let maxChunkSize = 16384;
+      progressbar.value = 0;
+
+      console.log(dataChannel.bufferedAmountLowThreshold);
+
+      file.arrayBuffer().then((buffer) => {
+        const send = () => {
+          if (file.name.length >= 35) {
+            let splitName = file.name.split('.');
+            file.name = splitName[0].substring(0, 20) + "... ." + splitName[1];
+          }
+          while (buffer.byteLength) {
+            if (
+              dataChannel.bufferedAmount >
+              dataChannel.bufferedAmountLowThreshold
+            ) {
+              dataChannel.onbufferedamountlow = () => {
+                dataChannel.onbufferedamountlow = null;
+                send();
+              };
+              return;
+            }
+            const chunk = buffer.slice(0, maxChunkSize);
+            buffer = buffer.slice(maxChunkSize, buffer.byteLength);
+            dataChannel.send(chunk);
+            offset += maxChunkSize;
+            console.log("Sent " + offset + " bytes.");
+            //----------------------------
+            // console.log(file);
+            progressArea = document.querySelector(".progress-area");
+            uploadedArea = document.querySelector(".uploaded-area");
+
+
+            let progressHTML = `<li class="row_data">
+                          <i class="fas fa-file-alt"></i>
+                          <div class="content">
+                            <div class="details">
+                              <span class="name">${file.name} </span>
+                              <span class="percent">${offset >= file.size ? "File sent" : ((offset / file.size) * 100).toFixed(1) + "%" + " • Uploading"}</span>
+                            </div>
+                            <div class="progress-bar">
+                              <div class="progress" style="width: ${((offset / file.size) * 100).toFixed(1)}%"></div>
+                            </div>
+                          </div>
+                        </li>`;
+            uploadedArea.classList.add("onprogress");
+            uploadedArea.innerHTML = "";
+            progressArea.innerHTML = progressHTML;
+            //------------------
+            progressbar.value = offset >= file.size ? file.size : offset;
+            progressLabel.innerHTML =
+              offset >= file.size
+                ? "File sent"
+                : ((offset / file.size) * 100).toFixed(1) + "%";
+          }
+        };
+
+        send();
+      });
+
+      //console.log(`File is ${[file.name, file.size, file.type, file.lastModified].join(' ')}`);
+      //fileReader = new FileReader();
+    }
+
+    function onReceiveMessageCallback(event) {
+      //console.log(receivedFile)
+
+      if (receivedFile["name"] == undefined) {
+        const file = JSON.parse(event.data);
+        console.log(file);
+        receivedFile = file;
+        progressbar.max = file.size;
+        progressbar.value = 0;
+        return;
+      }
+
+      receiveBuffer.push(event.data);
+      receivedSize += event.data.byteLength;
+      //----------------------------
+
+      progressArea = document.querySelector(".progress-area"),
+        uploadedArea = document.querySelector(".uploaded-area");
+      if (receivedFile["name"].length >= 15) {
+        let splitName = receivedFile["name"].split('.');
+        receivedFile["name"] = splitName[0].substring(0, 15) + "** ." + splitName[1];
+
+      }
+
+      // console.log("filename:f"+receivedFile["name"])
+      let progressHTML = `<li class="row_data">
+                          <i class="fas fa-file-alt"></i>
+                          <div class="content">
+                            <div class="details">
+                              <span class="name">${receivedFile["name"]} </span>
+                              <span class="percent">${"Receive: " + ((receivedSize / receivedFile.size) * 100).toFixed(1) + "%"}</span>
+                            </div>
+                            <div class="progress-bar">
+                              <div class="progress" style="width: ${((receivedSize / receivedFile.size) * 100).toFixed(1)}%"></div>
+                            </div>
+                          </div>
+                          <i class="fa fa-download" aria-hidden="true" id="download_show" data-bs-toggle="tooltip" data-bs-placement="top" data-bs-title="Click to download"></i>
+                        </li>`;
+      uploadedArea.classList.add("onprogress");
+      uploadedArea.innerHTML = "";
+      progressArea.innerHTML = progressHTML;
+      //------------------
+      progressbar.value = receivedSize;
+      progressLabel.innerHTML =
+        "Receive: " +
+        ((receivedSize / receivedFile.size) * 100).toFixed(1) +
+        "%";
+
+      if (receivedSize == receivedFile["size"]) {
+        const blob = new Blob(receiveBuffer, { type: receivedFile["type"] });
+        downloadAnchor.href = URL.createObjectURL(blob);
+        downloadAnchor.download = receivedFile["name"];
+        downloadAnchor.innerHTML = receivedFile["name"];
+        download_show.style.display = "block !important";
+        download_show.style.cursor = "pointer";
+        download_show.addEventListener('click', () => { downloadAnchor.click(); })
+        //downloadAnchor.click();
+        receiveBuffer = [];
+        receivedSize = 0;
+        receivedFile = {};
+      }
+    }
+  </script>
+
+  <script>
+    document.getElementById("drag_area").addEventListener('dragover', function (e) { e.preventDefault(); })
+    document.getElementById("drag_area").addEventListener('drop', (e) => {
+      e.preventDefault();
+      document.getElementById("file-upload").files = e.dataTransfer.files;
+      const file = fileUpload.files[0];
+      progressbar.max = file.size;
+      progressbar.value = 0;
+      progressLabel.innerHTML = 0;
+
+      dataChannel.send(
+        JSON.stringify({
+          name: file.name,
+          size: file.size,
+          type: file.type,
+        })
+      );
+
+      sendData();
+    })
+    local_copy.addEventListener('click', (e) => {
+      var text = document.getElementById("localConfigText").value;
+      navigator.clipboard.writeText(text).then(function () {
+        const tooltip1 = bootstrap.Tooltip.getInstance(local_copy);
+        tooltip1.setContent({
+          '.tooltip-inner': 'Copied!'
+        });
+        tooltip1.show();
+        // Reset tooltip to "Copy to clipboard" after 2 seconds
+        setTimeout(() => {
+          tooltip1.setContent({ '.tooltip-inner': 'Copy to clipboard' });
+        }, 2000);
+
+      }).catch(function (err) {
+        console.error("Error copying text: ", err);
+      });
+    })
+    remote_copy.addEventListener('click', () => {
+      navigator.clipboard.readText().then(function (text) {
+        // Paste the copied text into the textarea
+        document.getElementById("remoteConfigText").value = text;
+      }).catch(function (err) {
+        console.error("Failed to read clipboard: ", err);
+      });
+    })
+  </script>
+
+
+
+
+
+
+</body>
+
+</html>
